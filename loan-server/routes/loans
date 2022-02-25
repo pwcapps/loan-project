@@ -1,0 +1,55 @@
+const express = require('express');
+const pgp = require('pg-promise')();
+
+const cn = {
+    host: 'localhost',
+    port: 5432,
+    database: 'postgres',
+    user: 'postgres',
+    password: 'password',
+    max: 30
+};
+
+const db = pgp(cn);
+
+const loansRouter = express.Router();
+
+loansRouter.get('/get', (req, res) => {
+    const { loanId } = req.body;
+
+    db.one('SELECT * FROM loans WHERE loan_id = $1', loanId)
+    .then(loan => {
+       res.send(loan);
+    })
+    .catch(e => {
+        res.send(`Unable to get data for loan ${loanId}: ${e.message}`);
+    });
+});
+
+loansRouter.post('/', (req, res) => {
+    const { amount, interest, length, payment_amount } = req.body;
+
+    db.one('INSERT INTO loans(amount, interest, length, payment_amount)' + 
+    ' VALUES($1, $2, $3, $4) RETURNING loan_id',
+       [amount, interest, length, payment_amount]
+   ).then(data => {
+       res.send(`Created new loan, ID is ${data.loan_id}`);
+   }).catch(e => {
+       res.send(`Failed to create a new loan: ${e.message}`);
+   });
+});
+
+loansRouter.put('/:id', (req, res) => {
+    const loanId = req.params.id;
+    const { amount, interest, length, payment_amount } = req.body;
+
+    db.none('UPDATE loans SET amount = $1, interest = $2, length = $3, payment_amount = $4 WHERE loan_id = $5',
+        [amount, interest, length, payment_amount, loanId]
+   ).then(() => {
+       res.send(`Successfully updated loan ${loanId}`);
+   }).catch(e => {
+       res.send(`Failed to update the loan: ${e.message}`);
+   });
+});
+
+module.exports = loansRouter;
